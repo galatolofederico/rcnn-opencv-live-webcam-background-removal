@@ -53,7 +53,7 @@ Outputting the video to VLC
 python run.py --raw | vlc --demux=rawvideo --rawvid-fps=30 --rawvid-width=640 --rawvid-height=480 --rawvid-chroma=RV24 - --sout '#display'
 ```
 
-Streaming the video video UDP
+Streaming the video via UDP
 
 ```
 python run.py --raw --bgr | ffmpeg -f rawvideo -pix_fmt rgb24 -s 640x480 -r 30 -i - -an -f mpegts udp://0.0.0.0:5555
