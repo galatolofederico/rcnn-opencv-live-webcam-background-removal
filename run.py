@@ -28,6 +28,7 @@ cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--input", type=int, help="Input webcam index", default=0)
+parser.add_argument("--movth", type=float, help="Movement threshold", default=5.0)
 
 parser.add_argument("--debug", action="store_true", help="Print debug messages")
 
@@ -47,6 +48,8 @@ if not args.window and not args.raw and not args.info:
 capture = cv2.VideoCapture(args.input)
 predictor = DefaultPredictor(cfg)
 tracker = cv2.TrackerMOSSE_create()
+backSub = cv2.createBackgroundSubtractorKNN(history=100)
+
 
 width  = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -89,20 +92,28 @@ def main():
     mask = None
     box = None
 
+    firstmask = True
+
     ret, frame = capture.read()
     cnn_in.put(frame)
     while True:
         ret, frame = capture.read()
         new = False
-
         if frame is None: break
+        
+        movMask = backSub.apply(frame)
+        if args.debug: cv2.imshow("movMask", movMask)
 
         try:
             outputs = cnn_out.get(False)
-            if args.debug: print("New mask!")
-            if outputs is not None:
-                lastmask, lastbox = outputs
-                new = True
+            if np.mean(movMask) < args.movth or firstmask:
+                if args.debug: print("New mask!")
+                if outputs is not None:
+                    lastmask, lastbox = outputs
+                    new = True
+                    firstmask = False
+            else:
+                if args.debug: print("New mask rejected! (movth=%f)" % (np.mean(movMask)))
             if args.debug: print("Sending frame to CNN...")
             cnn_in.put(frame)
             
@@ -140,7 +151,7 @@ def main():
             if args.debug: cv2.rectangle(result, (x, y), (x+w, y+h), (0, 0, 255), 2)
 
             if args.window:
-                cv2.imshow("mask", result)
+                cv2.imshow("result", result)
             if args.raw:
                 if not args.bgr:
                     result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
